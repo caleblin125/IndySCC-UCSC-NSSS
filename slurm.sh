@@ -52,9 +52,7 @@ for NODE_INFO in "${NODES[@]}"; do
     # Use sshpass + sudo -S to allow sudo with password
     sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$SSH_USER@$NODE" bash -c "'
         echo \"$PASS\" | sudo -S DEBIAN_FRONTEND=noninteractive apt update -qq >/dev/null &&
-        echo \"$PASS\" | sudo -S DEBIAN_FRONTEND=noninteractive apt install -y -qq munge libmunge2 libmunge-dev >/dev/null &&
-        munge -n | unmunge | grep STATUS && 
-        echo \"Munge installation completed on \$(hostname) at \$(date)\" | sudo tee /tmp/munge_installed.txt >/dev/null
+        echo \"$PASS\" | sudo -S DEBIAN_FRONTEND=noninteractive apt install -y -qq munge libmunge2 libmunge-dev >/dev/null
     '"
 
 done
@@ -78,6 +76,7 @@ for NODE_INFO in "${NODES[@]}"; do
         sudo chown -R munge: /etc/munge/munge.key &&
         sudo systemctl enable munge &&
         sudo systemctl restart munge &&
+        munge -n | unmunge | grep STATUS &&
         echo \"Munge installation and key copied on \$(hostname) at \$(date)\" | sudo tee /tmp/munge_installed.txt
     '"
 
@@ -140,8 +139,6 @@ sudo systemctl enable slurmctld
 sudo systemctl restart slurmctld
 sudo systemctl status slurmctld.service
 
-
-
 echo "-------------SLURM COPIES----------------"
 for NODE_INFO in "${NODES[@]}"; do
     NODE="${NODE_INFO%%:*}"
@@ -160,7 +157,7 @@ for NODE_INFO in "${NODES[@]}"; do
         sudo systemctl enable slurmd &&
         sudo systemctl restart slurmd &&
         sudo systemctl status slurmd.service &&
-        echo \"Slurm on \$(hostname) at \$(date)\" | sudo tee /tmp/munge_installed.txt
+        echo \"Slurm on \$(hostname) at \$(date)\" | sudo tee /tmp/slurm_installed.txt
     '"
 
     echo "[+] Slurm installation marked on $NODE"
@@ -179,3 +176,37 @@ scontrol show nodes
 # sudo systemctl enable mariadb
 # sudo systemctl start mariadb
 # sudo mysql_secure_installation
+
+
+echo "-------------SHARED FILESYSTEM----------------"
+
+sudo apt update
+sudo apt install nfs-kernel-server
+
+sudo mkdir -p /shared
+sudo chown exouser:exouser /shared
+sudo chmod 755 /shared
+
+sudo echo "/shared  149.165.154.0/24(rw,sync,no_root_squash,no_subtree_check)" >> /etc/exports
+
+sudo exportfs -ra
+sudo systemctl restart nfs-kernel-server
+exportfs -v
+
+for NODE_INFO in "${NODES[@]}"; do
+    NODE="${NODE_INFO%%:*}"
+    PASS="${NODE_INFO##*:}"
+
+    echo "[*] Setting up filesystem to $NODE... <---------------------"
+    sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$SSH_USER@$NODE" bash -c "'
+        sudo DEBIAN_FRONTEND=noninteractive apt install nfs-common >/dev/null
+    '"
+    sshpass -p "$PASS" ssh -o StrictHostKeyChecking=no "$SSH_USER@$NODE" bash -c "'
+        sudo mkdir -p /shared &&
+        sudo mount login:/shared /shared &&
+        sudo echo "login:/shared   /shared   nfs   defaults  0  0" >> /etc/exports && 
+        ls /shared &&
+        echo \"Shared filesystem on \$(hostname) at \$(date)\" | sudo tee /tmp/nfs_installed.txt
+    '"
+
+done
