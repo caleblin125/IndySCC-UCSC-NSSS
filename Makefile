@@ -176,24 +176,13 @@ disable-firewall:
 #Shared filesystem setup (NFS)
 #-------------------------------
 shared-fs:
-	@echo "------------- NFS SHARED FILESYSTEM ----------------"
-	sudo apt install -y -qq nfs-kernel-server
-	sudo mkdir -p /shared
-	sudo chown $(SSH_USER):$(SSH_USER) /shared
-	sudo chmod 755 /shared
-	echo "/shared  149.165.154.0/24(rw,sync,no_root_squash,no_subtree_check)" | sudo tee -a /etc/exports >/dev/null
-	sudo exportfs -ra
-	sudo systemctl restart nfs-kernel-server
-
+	@echo "------------- SHARED FILESYSTEM ----------------"
+	sudo bash setup_manila.sh
 	@for NODE_INFO in $(NODES); do \
 		NODE=$${NODE_INFO%%:*}; \
 		PASS=$${NODE_INFO##*:}; \
-		echo "[*] Mounting NFS on $$NODE..."; \
-		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" bash -c "'\
-			sudo apt install -y -qq nfs-common && \
-			sudo mkdir -p /shared && \
-			sudo mount login:/shared /shared && \
-			echo \"login:/shared   /shared   nfs   defaults  0  0\" | sudo tee -a /etc/fstab \
-		'"; \
+		echo "[*] Running setup_manila.sh on $$NODE..."; \
+		cat setup_manila.sh | sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" "bash -s"; \
 	done
-	@echo "------------- NFS SHARED FILESYSTEM ----------------"
+	@echo "------------- SHARED FILESYSTEM ----------------"
+
