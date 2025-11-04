@@ -1,0 +1,11 @@
+[1;31m==>[0m Error: hpl matches multiple packages.
+  Matching packages:
+    [0;90mt7v4cds[0m hpl[0;36m@2.3[0m[0;35m platform=linux[0m[0;35m os=ubuntu24.04[0m[0;35m target=zen3[0m[0;32m%gcc[0m[0;32m@13.3.0[0m
+    [0;90map6gqfj[0m hpl[0;36m@2.3[0m[0;35m platform=linux[0m[0;35m os=ubuntu24.04[0m[0;35m target=zen3[0m[0;32m%gcc[0m[0;32m@13.3.0[0m
+  Use a more specific spec (e.g., prepend '/' to the hash).
+[1;31m==>[0m Error: openmpi matches multiple packages.
+  Matching packages:
+    [0;90mciyamgp[0m openmpi[0;36m@5.0.8[0m[0;35m platform=linux[0m[0;35m os=ubuntu24.04[0m[0;35m target=zen3[0m[0;32m%gcc[0m[0;32m@13.3.0[0m
+    [0;90mpl7r5to[0m openmpi[0;36m@5.0.8[0m[0;35m platform=linux[0m[0;35m os=ubuntu24.04[0m[0;35m target=zen3[0m[0;32m%gcc[0m[0;32m@13.3.0[0m
+  Use a more specific spec (e.g., prepend '/' to the hash).
+/var/spool/slurmd/job00069/slurm_script: line 29: mpirun: command not found

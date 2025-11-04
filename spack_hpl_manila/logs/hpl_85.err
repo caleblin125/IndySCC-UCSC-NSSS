@@ -1,0 +1,5 @@
+srun: error: If munged is up, restart with --num-threads=10
+srun: error: Munge encode failed: Failed to access "/mnt/spack_hpl_manila/spack/opt/spack/linux-zen3/munge-0.5.15-hjzoe65o2dvvtc25addf4xmm4d632tbd/var/run/munge/munge.socket.2": No such file or directory (Did you start munged?)
+srun: error: slurm_buffers_pack_msg: auth_g_create: REQUEST_HET_JOB_ALLOC_INFO has authentication error
+srun: error: Unable to confirm allocation for job 85: Protocol authentication error
+srun: Check SLURM_JOB_ID environment variable. Expired or invalid job 85
