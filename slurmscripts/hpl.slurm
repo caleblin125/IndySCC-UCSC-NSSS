@@ -33,3 +33,5 @@ mpirun --allow-run-as-root -np $SLURM_NPROCS xhpl > hpl.out
 
 echo "HPL run finished on $(date)"
 
+/mnt/spack_hpl_manila/spack/opt/spack/linux-zen3/openmpi-5.0.8-ciyamgpjqe7un4rqfhcwdtrhjlpubwzt/bin/mpirun --host worker-1-of-9:64,worker-2-of-9:64,worker-3-of-9:64,worker-4-of-9:64,worker-5-of-9:64,worker-6-of-9:64,worker-7-of-9:64,worker-8-of-9:64,worker-9-of-9:64 -n 576 /mnt/spack_hpl_manila/spack/opt/spack/linux-zen3/hpl-2.3-t7v4cdshucmgdoqpbyuvaqyoh7tslpql/bin/xhpl
+

@@ -138,7 +138,7 @@ slurm-reload:
 	sudo cp -f slurm.conf /etc/slurm/slurm.conf
 	sudo systemctl enable slurmctld
 	sudo systemctl restart slurmctld
-	sudo systemctl status slurmctld.service
+	yes | sudo systemctl status slurmctld.service
 
 	@for NODE_INFO in $(NODES); do \
 		NODE=$${NODE_INFO%%:*}; \
@@ -159,6 +159,16 @@ share:
 		echo "[*] Resetting and copying ~/share to $$NODE..."; \
 		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no $(SSH_USER)@$$NODE "rm -rf ~/share"; \
 		sshpass -p "$$PASS" scp -r -o StrictHostKeyChecking=no ~/share $(SSH_USER)@$$NODE:~/share; \
+	done
+	@echo "------------- SHARE COMPLETE ----------------"
+
+disable-firewall:
+	@echo "------------- SHARE FILES ----------------"
+	@for NODE_INFO in $(NODES); do \
+		NODE=$${NODE_INFO%%:*}; \
+		PASS=$${NODE_INFO##*:}; \
+		echo "[*] disable firewall $$NODE..."; \
+		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no $(SSH_USER)@$$NODE "sudo ufw disable"; \
 	done
 	@echo "------------- SHARE COMPLETE ----------------"
 
