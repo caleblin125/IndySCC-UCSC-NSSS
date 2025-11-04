@@ -3,23 +3,35 @@
 
 SSH_USER := exouser
 
+LOGINIP := 149.165.171.234
+LOGIN := herologin
+
 # Define nodes (format: NODE:PASS)
 NODES := \
-  "149.165.150.159:AURA DANA LIMA OLIN BAND RAG SCOT MEAN MEL WE RAW" \
-  "149.165.151.146:WELD RIFT VICE JEFF CAIN TICK FUN DART HOCK ORR HILL" \
-  "149.165.169.104:TAD BOOM DOME FORT ICY BED STAN HULL MIND WORK BILL" \
-  "149.165.170.88:CHAR BIEN BRAD PI SCAT LEON LUKE TROT GUT EWE VAT" \
-  "149.165.170.103:WHAT DRAG MILL GOAT ROUT HAST VAST STAY ED RULE BIT" \
-  "149.165.172.202:RANT AUG WU HAYS ARE ASKS COLA HIKE LID ELLA DUEL" \
-  "149.165.168.148:OTIS RENT SEE DAM OATH ARC HONE WEEK LOVE BID GARB" \
-  "149.165.169.48:CAL DARN HAS GAUR LARD AUTO LIE USES ABE RISK AYE" \
-  "149.165.151.122:ACRE FONT OVEN MAP KURT BRIG TORE SLOW SAYS RING REAM" \
-  "149.165.174.131:GRAD BOND HAUL LUGE BUM THUD HUGH GUNK JERK SOFA BYE" \
-  "149.165.175.119:DANA GUM LOON LEST MAN ROOF HASH POE LYNN LAKE OHIO"
+  "149.165.168.188:HAVE SLAM USES BURR LIMA BOG NEED HEAL WAY BET MAO" \
+  "149.165.171.243:LINK BODE JUST ANY RAVE BUDD FLUB SCAT RUST HELD BOTH" \
+  "149.165.174.243:HIP MEMO LINE BAWL OUT HARD GENT LA MALT LENS EGG" \
+  "149.165.150.159:GAL SLOG NESS CADY CARL ROOD SHED COT REEL FORD WINE" \
+  "149.165.175.218:FIR FOAM CODA DUE GARY BALK HOYT TICK GASH FLUB YARD" \
+  "149.165.169.217:FEED LUSH RISE TIP LIMA NAVE DARE FIRE HERO MOCK SOW" \
+  "149.165.168.25:RUTH QUOD BONE BEY NOVA VOID DOCK MANN USER VERY HAUL" \
+  "149.165.175.152:SHOE WORD MOE MEND TWIG DUMB NOVA HOUR TUB SKEW TRIO" \
+  "149.165.169.133:SEAL BATE PEG OWLY BULB FARM BRAE MIT NOON CUNY CURD"
 
-.PHONY: all slurm-munge slurm-setup share
+NAMES := \
+	"worker-1-of-9"\
+	"worker-2-of-9"\
+	"worker-3-of-9"\
+	"worker-4-of-9"\
+	"worker-5-of-9"\
+	"worker-6-of-9"\
+	"worker-7-of-9"\
+	"worker-8-of-9"\
+	"worker-9-of-9"
 
-all: slurm-munge slurm-setup share
+.PHONY: all slurm-munge add-all-hosts slurm-setup share
+
+all: slurm-munge add-all-hosts slurm-setup share
 
 # -------------------------------
 # MUNGE installation and key sync
@@ -61,6 +73,32 @@ slurm-munge:
 	done
 	@echo "------------- MUNGE SETUP FINISH ----------------"
 
+add-all-hosts:
+	@echo "------------- ADD ALL HOSTS START ----------------"
+	# Add controller
+	@echo "Adding controller $$LOGIN ($$LOGINIP) to /etc/hosts"; \
+	sudo echo "$$LOGINIP $$LOGIN" | sudo tee -a /etc/hosts >/dev/null; \
+
+	# Add workers
+	i=1; \
+	for NODE_INFO in $(NODES); do \
+	    NODE=$${NODE_INFO%%:*}; \
+	    PASS="$${NODE_INFO##*:}"; \
+	    HOSTNAME=$$(echo $(NAMES) | cut -d' ' -f$$i); \
+	    echo "Adding $$NODE $$HOSTNAME to /etc/hosts"; \
+	    echo "$$NODE $$HOSTNAME" | sudo tee -a /etc/hosts >/dev/null; \
+	    i=$$((i+1)); \
+	done
+
+	# Copy /etc/hosts to each worker
+	@for NODE_INFO in $(NODES); do \
+	    NODE=$${NODE_INFO%%:*}; \
+	    PASS=$${NODE_INFO##*:}; \
+	    echo "Copying /etc/hosts to $$NODE"; \
+	    sudo cat /etc/hosts | sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" "sudo tee /etc/hosts >/dev/null"; \
+	done
+
+	@echo "------------- ADD ALL HOSTS FINISH ----------------"
 # -------------------------------
 # SLURM installation + config sync
 # -------------------------------
@@ -95,8 +133,12 @@ slurm-setup:
 
 slurm-reload:
 	@echo "------------- SLURM RELOAD ----------------"
+	@echo "Writing /etc/slurm/slurm.conf..."
+	
+	sudo cp -f slurm.conf /etc/slurm/slurm.conf
 	sudo systemctl enable slurmctld
 	sudo systemctl restart slurmctld
+	sudo systemctl status slurmctld.service
 
 	@for NODE_INFO in $(NODES); do \
 		NODE=$${NODE_INFO%%:*}; \
@@ -104,7 +146,7 @@ slurm-reload:
 		echo "[*] Copying config to $$NODE..."; \
 		sudo cat /etc/slurm/slurm.conf | sshpass -p "$$PASS" ssh "$(SSH_USER)@$$NODE" "sudo tee /etc/slurm/slurm.conf >/dev/null"; \
 		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" bash -c "'\
-			sudo systemctl enable slurmd && sudo systemctl restart slurmd \
+			sudo systemctl enable slurmd && sudo systemctl restart slurmd && sudo systemctl status slurmd.service\
 		'"; \
 	done
 	@echo "------------- SLURM RELOAD ----------------"
@@ -120,29 +162,28 @@ share:
 	done
 	@echo "------------- SHARE COMPLETE ----------------"
 
+#-------------------------------
+#Shared filesystem setup (NFS)
+#-------------------------------
+shared-fs:
+	@echo "------------- NFS SHARED FILESYSTEM ----------------"
+	sudo apt install -y -qq nfs-kernel-server
+	sudo mkdir -p /shared
+	sudo chown $(SSH_USER):$(SSH_USER) /shared
+	sudo chmod 755 /shared
+	echo "/shared  149.165.154.0/24(rw,sync,no_root_squash,no_subtree_check)" | sudo tee -a /etc/exports >/dev/null
+	sudo exportfs -ra
+	sudo systemctl restart nfs-kernel-server
 
-# -------------------------------
-# Shared filesystem setup (NFS)
-# -------------------------------
-# shared-fs:
-# 	@echo "------------- NFS SHARED FILESYSTEM ----------------"
-# 	sudo apt install -y -qq nfs-kernel-server
-# 	sudo mkdir -p /shared
-# 	sudo chown $(SSH_USER):$(SSH_USER) /shared
-# 	sudo chmod 755 /shared
-# 	echo "/shared  149.165.154.0/24(rw,sync,no_root_squash,no_subtree_check)" | sudo tee -a /etc/exports >/dev/null
-# 	sudo exportfs -ra
-# 	sudo systemctl restart nfs-kernel-server
-
-# 	@for NODE_INFO in $(NODES); do \
-# 		NODE=$${NODE_INFO%%:*}; \
-# 		PASS=$${NODE_INFO##*:}; \
-# 		echo "[*] Mounting NFS on $$NODE..."; \
-# 		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" bash -c "'\
-# 			sudo apt install -y -qq nfs-common && \
-# 			sudo mkdir -p /shared && \
-# 			sudo mount login:/shared /shared && \
-# 			echo \"login:/shared   /shared   nfs   defaults  0  0\" | sudo tee -a /etc/fstab \
-# 		'"; \
-# 	done
-# 	@echo "------------- NFS SHARED FILESYSTEM ----------------"
+	@for NODE_INFO in $(NODES); do \
+		NODE=$${NODE_INFO%%:*}; \
+		PASS=$${NODE_INFO##*:}; \
+		echo "[*] Mounting NFS on $$NODE..."; \
+		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" bash -c "'\
+			sudo apt install -y -qq nfs-common && \
+			sudo mkdir -p /shared && \
+			sudo mount login:/shared /shared && \
+			echo \"login:/shared   /shared   nfs   defaults  0  0\" | sudo tee -a /etc/fstab \
+		'"; \
+	done
+	@echo "------------- NFS SHARED FILESYSTEM ----------------"
