@@ -3,35 +3,28 @@
 
 SSH_USER := exouser
 
-LOGINIP := 149.165.171.234
+LOGINIP := 149.165.169.68
 LOGIN := herologin
+
+SSHKEY := herologinkey
 
 # Define nodes (format: NODE:PASS)
 NODES := \
-  "149.165.168.188:HAVE SLAM USES BURR LIMA BOG NEED HEAL WAY BET MAO" \
-  "149.165.171.243:LINK BODE JUST ANY RAVE BUDD FLUB SCAT RUST HELD BOTH" \
-  "149.165.174.243:HIP MEMO LINE BAWL OUT HARD GENT LA MALT LENS EGG" \
-  "149.165.150.159:GAL SLOG NESS CADY CARL ROOD SHED COT REEL FORD WINE" \
-  "149.165.175.218:FIR FOAM CODA DUE GARY BALK HOYT TICK GASH FLUB YARD" \
-  "149.165.169.217:FEED LUSH RISE TIP LIMA NAVE DARE FIRE HERO MOCK SOW" \
-  "149.165.168.25:RUTH QUOD BONE BEY NOVA VOID DOCK MANN USER VERY HAUL" \
-  "149.165.175.152:SHOE WORD MOE MEND TWIG DUMB NOVA HOUR TUB SKEW TRIO" \
-  "149.165.169.133:SEAL BATE PEG OWLY BULB FARM BRAE MIT NOON CUNY CURD"
+  "149.165.172.252:ANDY GLEN DADE CASH HOC FEAT VAIL SAP YARN NEWT JIVE" \
+  "149.165.172.173:SAY TIM THIS BARR AVID EVIL SONG FLAM HECK STOW DOTE" \
+  "149.165.175.226:NON IO FOOD JAIL HANG BREW GRAY ORB JAVA COLT FLED" \
+  "149.165.168.136:RUN PIN CUBA FOAL CITE HUED MIRE ANNA TOGO ONLY ACE"
 
 NAMES := \
-	"worker-1-of-9"\
-	"worker-2-of-9"\
-	"worker-3-of-9"\
-	"worker-4-of-9"\
-	"worker-5-of-9"\
-	"worker-6-of-9"\
-	"worker-7-of-9"\
-	"worker-8-of-9"\
-	"worker-9-of-9"
+	"worker-1-of-3"\
+	"worker-2-of-3"\
+	"worker-3-of-3"\
+	"workergpu"
 
-.PHONY: all slurm-munge add-all-hosts slurm-setup share
+.PHONY: all slurm-munge add-all-hosts slurm-setup 
 
-all: slurm-munge add-all-hosts slurm-setup share
+all: slurm-munge ssh-share add-all-hosts slurm-setup shared-fs
+clean: mpi-clean slurm-reload
 
 # -------------------------------
 # MUNGE installation and key sync
@@ -73,11 +66,55 @@ slurm-munge:
 	done
 	@echo "------------- MUNGE SETUP FINISH ----------------"
 
+ssh-share:
+	@echo "------------- ADD ALL SSH START ----------------"
+
+	rm ~/.ssh/known_hosts ~/.ssh/known_hosts.old
+	@echo "Adding controller $(LOGIN) $(LOGINIP) to /etc/hosts"
+	cat ~/.ssh/$(SSHKEY).pub >> ~/.ssh/authorized_keys
+
+	@i=1; \
+	for NODE_INFO in $(NODES); do \
+	    NODE=$${NODE_INFO%%:*}; \
+	    PASS=$${NODE_INFO##*:}; \
+	    HOSTNAME=$$(echo $(NAMES) | cut -d' ' -f$$i); \
+	    echo "Adding $$NODE ($$HOSTNAME) to SSH authorized keys"; \
+	    sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" "\
+			rm -f ~/.ssh/known_hosts ~/.ssh/known_hosts.old && \
+	        mkdir -p ~/.ssh && \
+	        if [ ! -f ~/.ssh/id_rsa ]; then \
+	            echo 'Generating new SSH key for $$HOSTNAME...'; \
+	            ssh-keygen -t rsa -b 4096 -C '$$HOSTNAME' -f ~/.ssh/id_rsa -N ''; \
+	        else \
+	            echo 'SSH key already exists on $$HOSTNAME, skipping generation.'; \
+	        fi"; \
+	    sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" "\
+	        cat ~/.ssh/id_rsa.pub" >> ~/.ssh/authorized_keys; \
+	    i=$$((i+1)); \
+	done
+
+	sort -u ~/.ssh/authorized_keys -o ~/.ssh/authorized_keys
+
+	@i=1; \
+	for NODE_INFO in $(NODES); do \
+	    NODE=$${NODE_INFO%%:*}; \
+	    PASS=$${NODE_INFO##*:}; \
+	    echo "Copying authorized_keys to $$NODE"; \
+	    cat ~/.ssh/authorized_keys | sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" "\
+	        mkdir -p ~/.ssh && cat > ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"; \
+	    i=$$((i+1)); \
+	done
+
+	@echo "------------- ADD ALL SSH END ----------------"
+
 add-all-hosts:
 	@echo "------------- ADD ALL HOSTS START ----------------"
 	# Add controller
-	@echo "Adding controller $$LOGIN ($$LOGINIP) to /etc/hosts"; \
-	sudo echo "$$LOGINIP $$LOGIN" | sudo tee -a /etc/hosts >/dev/null; \
+
+	sudo cat defaultHosts | sudo tee /etc/hosts >/dev/null; 
+
+	@echo "Adding controller $(LOGIN) $(LOGINIP) to /etc/hosts"; \
+	sudo echo "$(LOGINIP) $(LOGIN)" | sudo tee -a /etc/hosts >/dev/null; \
 
 	# Add workers
 	i=1; \
@@ -104,7 +141,7 @@ add-all-hosts:
 # -------------------------------
 slurm-setup:
 	@echo "------------- SLURM INSTALL START ----------------"
-	sudo apt install -y -qq slurm-wlm libpmix-dev libpmix2
+	sudo apt install -y -qq slurm-wlm libpmix-dev libpmix2 slurm-wlm-basic-plugins slurm-wlm-basic-plugins-dev 
 	sudo mkdir -p /etc/slurm /var/spool/slurmctld /var/spool/slurmd
 	sudo chown slurm:slurm /var/spool/slurmctld /var/spool/slurmd
 	sudo chmod 755 /var/spool/slurmctld /var/spool/slurmd
@@ -118,12 +155,12 @@ slurm-setup:
 	@for NODE_INFO in $(NODES); do \
 		NODE=$${NODE_INFO%%:*}; \
 		PASS=$${NODE_INFO##*:}; \
-		echo "[*] Installing Slurm on $$NODE..."; \
+		echo "[*] Installing Slurm on $$NODE... <----------------"; \
 		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" bash -c "'\
-			sudo apt install -y -qq slurm-wlm libpmix-dev libpmix2 && \
+			sudo apt install -y slurm-wlm libpmix-dev libpmix2 slurm-wlm-basic-plugins slurm-wlm-basic-plugins-dev&& \
 			sudo mkdir -p /var/spool/slurmd && sudo chown slurm:slurm /var/spool/slurmd && sudo chmod 755 /var/spool/slurmd \
 		'"; \
-		echo "[*] Copying config to $$NODE..."; \
+		echo "[*] Copying config to $$NODE... <-----------------"; \
 		sudo cat /etc/slurm/slurm.conf | sshpass -p "$$PASS" ssh "$(SSH_USER)@$$NODE" "sudo tee /etc/slurm/slurm.conf >/dev/null"; \
 		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" bash -c "'\
 			sudo systemctl enable slurmd && sudo systemctl restart slurmd \
@@ -138,7 +175,7 @@ slurm-reload:
 	sudo cp -f slurm.conf /etc/slurm/slurm.conf
 	sudo systemctl enable slurmctld
 	sudo systemctl restart slurmctld
-	yes | sudo systemctl status slurmctld.service
+	yes q | sudo systemctl status slurmctld.service
 
 	@for NODE_INFO in $(NODES); do \
 		NODE=$${NODE_INFO%%:*}; \
@@ -163,14 +200,42 @@ share:
 	@echo "------------- SHARE COMPLETE ----------------"
 
 disable-firewall:
-	@echo "------------- SHARE FILES ----------------"
+	@echo "------------- FIREWALL ----------------"
 	@for NODE_INFO in $(NODES); do \
 		NODE=$${NODE_INFO%%:*}; \
 		PASS=$${NODE_INFO##*:}; \
 		echo "[*] disable firewall $$NODE..."; \
 		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no $(SSH_USER)@$$NODE "sudo ufw disable"; \
 	done
-	@echo "------------- SHARE COMPLETE ----------------"
+	@echo "------------- FIREWALL COMPLETE ----------------"
+
+
+mpi-install:
+	@echo "------------- MPI INSTALL ----------------"
+	sudo apt install -y pkg-config openmpi-bin libopenmpi-dev
+	@for NODE_INFO in $(NODES); do \
+		NODE=$${NODE_INFO%%:*}; \
+		PASS=$${NODE_INFO##*:}; \
+		echo "[*] install mpi $$NODE..."; \
+		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no $(SSH_USER)@$$NODE " \
+		 sudo apt install -y openmpi-bin libopenmpi-dev && \
+		 mkdir ~/openmpi && mkdir ~/openmpi/bin && \
+		 sudo cp /usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/orte/orted ~/openmpi/bin"; \
+	done
+	@echo "------------- MPI INSTALL COMPLETE ----------------"
+
+mpi-clean:
+	@echo "------------- MPI DEL ----------------"
+	@for NODE_INFO in $(NODES); do \
+		NODE=$${NODE_INFO%%:*}; \
+		PASS=$${NODE_INFO##*:}; \
+		echo "[*] delete mpi $$NODE..."; \
+		sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" \
+		"sudo pkill -u $$USER -f mpirun || true; sudo rm -rf /dev/shm/openmpi.*; \
+		 sudo pkill -9 pmix orted mpirun hpl || true;" || true; \
+	done
+	@echo "------------- MPI DEL COMPLETE ----------------"
+
 
 #-------------------------------
 #Shared filesystem setup (NFS)
@@ -182,7 +247,7 @@ shared-fs:
 		NODE=$${NODE_INFO%%:*}; \
 		PASS=$${NODE_INFO##*:}; \
 		echo "[*] Running setup_manila.sh on $$NODE..."; \
-		cat setup_manila.sh | sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" "bash -s"; \
+		cat setup_manila.sh | sshpass -p "$$PASS" ssh -o StrictHostKeyChecking=no "$(SSH_USER)@$$NODE" sudo bash -s; \
 	done
 	@echo "------------- SHARED FILESYSTEM ----------------"
 

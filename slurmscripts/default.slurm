@@ -3,5 +3,3 @@
 #SBATCH --output=/shared/exouser/output.o
 #SBATCH --time=00:10:00
 #SBATCH --partition=debug
-
-
