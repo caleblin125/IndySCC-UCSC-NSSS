@@ -3,17 +3,17 @@
 
 SSH_USER := exouser
 
-LOGINIP := 149.165.169.68
+LOGINIP := 149.165.150.100
 LOGIN := herologin
 
 SSHKEY := herologinkey
 
 # Define nodes (format: NODE:PASS)
 NODES := \
-  "149.165.172.252:ANDY GLEN DADE CASH HOC FEAT VAIL SAP YARN NEWT JIVE" \
-  "149.165.172.173:SAY TIM THIS BARR AVID EVIL SONG FLAM HECK STOW DOTE" \
-  "149.165.175.226:NON IO FOOD JAIL HANG BREW GRAY ORB JAVA COLT FLED" \
-  "149.165.168.136:RUN PIN CUBA FOAL CITE HUED MIRE ANNA TOGO ONLY ACE"
+  "149.165.153.230:ANDY GLEN DADE CASH HOC FEAT VAIL SAP YARN NEWT JIVE" \
+  "149.165.150.184:SAY TIM THIS BARR AVID EVIL SONG FLAM HECK STOW DOTE" \
+  "149.165.151.133:NON IO FOOD JAIL HANG BREW GRAY ORB JAVA COLT FLED" \
+  "149.165.150.61:RUN PIN CUBA FOAL CITE HUED MIRE ANNA TOGO ONLY ACE"
 
 NAMES := \
 	"worker-1-of-3"\
@@ -24,6 +24,7 @@ NAMES := \
 .PHONY: all slurm-munge add-all-hosts slurm-setup 
 
 all: slurm-munge ssh-share add-all-hosts slurm-setup shared-fs
+reconnect: ssh-share add-all-hosts slurm-reload
 clean: mpi-clean slurm-reload
 
 # -------------------------------
@@ -186,6 +187,16 @@ slurm-reload:
 			sudo systemctl enable slurmd && sudo systemctl restart slurmd && sudo systemctl status slurmd.service\
 		'"; \
 	done
+
+	i=1; \
+	for NODE_INFO in $(NODES); do \
+	    NODE=$${NODE_INFO%%:*}; \
+	    PASS="$${NODE_INFO##*:}"; \
+	    HOSTNAME=$$(echo $(NAMES) | cut -d' ' -f$$i); \
+	    sudo scontrol update NodeName=$$HOSTNAME State=resume \
+	    i=$$((i+1)); \
+	done
+	
 	@echo "------------- SLURM RELOAD ----------------"
 
 share:
