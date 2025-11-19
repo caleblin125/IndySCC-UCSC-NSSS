@@ -166,16 +166,27 @@ add_build $INSTALL_DIR/pythia8313
 cd $CLONE_DIR
 sudo apt install binutils cmake dpkg-dev g++ gcc libssl-dev git libx11-dev \
     libxext-dev libxft-dev libxpm-dev python3 libtbb-dev libvdt-dev libgif-dev
+sudo rm -rf root
 git clone https://github.com/root-project/root.git #root not working yet
 cd root
 git checkout v6-34-04 #first time I checked out the specific version, hopefully works fine with previously cloned repos
 
-mkdir $CLONE_DIR/rootbuild
-cd $CLONE_DIR/rootbuild
-mkdir -p $INSTALL_DIR/root
-cmake $CLONE_DIR/root -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/root -Dgnuinstall=ON
-sudo make -j8 
-sudo make -j8 install
+mkdir -p $BUILD_DIR/root $INSTALL_DIR/root
+cd $BUILD_DIR/root
+sudo rm -rf CMakeCache.txt CMakeFiles $CLONE_DIR/root/CMakeCache.txt $CLONE_DIR/root/CMakeFiles
+cmake $CLONE_DIR/root \
+    -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/root \
+    -Dgnuinstall=ON \
+    -DCMAKE_CXX_STANDARD=20 \
+    -Dvdt=OFF \
+    -Dxrootd=OFF \
+    -Ddavix=OFF \
+    -DCMAKE_CXX_FLAGS="-w" \
+    -Droottest="OFF" \
+    -Dtesting="OFF" \
+    -DCMAKE_BUILD_TYPE=RELEASE 
+cmake --build $BUILD_DIR/rootbuild -j8 
+cmake --install $INSTALL_DIR/rootbuild -j8
 add_build $INSTALL_DIR/root
 
 #install hepmc
@@ -184,6 +195,7 @@ git clone https://gitlab.cern.ch/hepmc/HepMC3.git
 cd HepMC3 
 git checkout 3.3.1
 mkdir -p $INSTALL_DIR/HepMC3
+sudo rm -rf CMakeCache.txt CMakeFiles $CLONE_DIR/HepMC3/CMakeCache.txt $CLONE_DIR/HepMC3/CMakeFiles
 cmake -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/HepMC3   \
         -DHEPMC3_ENABLE_ROOTIO:BOOL=OFF            \
         -DHEPMC3_ENABLE_PROTOBUFIO:BOOL=OFF        \
@@ -204,6 +216,7 @@ git checkout v02-22-05
 mkdir build
 cd build
 mkdir -p $INSTALL_DIR/LCIO
+sudo rm -rf CMakeCache.txt CMakeFiles $CLONE_DIR/LCIO/CMakeCache.txt $CLONE_DIR/LCIO/CMakeFiles
 cmake .. -DBUILD_ROOTDICT=ON -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/LCIO
 make -j 8 install
 cd ..
@@ -346,6 +359,7 @@ source $BUILD_DIR/acts/install_this_acts_withdeps.sh
 # sudo make -j8 install
 add_build $INSTALL_DIR/acts
 
+cd $BUILD_DIR/acts
 python3 ../../acts/Examples/Scripts/Python/full_chain_odd_sc25.py --ttbar --no-output-root --onlyWriteVertices
 
 
