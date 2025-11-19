@@ -188,7 +188,7 @@ slurm-reload:
 		'"; \
 	done
 
-	i=1; \
+	i=0; \
 	for NODE_INFO in $(NODES); do \
 	    NODE=$${NODE_INFO%%:*}; \
 	    PASS="$${NODE_INFO##*:}"; \
