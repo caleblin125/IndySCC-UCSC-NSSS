@@ -3,7 +3,7 @@ set -e # Exit immediately if any command fails
 
 # --- Configuration from your screenshot ---
 CLIENT_NAME="scc110-hpl-spack"
-ACCESS_KEY="AQCJIwlpSjuJFRAAUMNyErjGKaLWJykTQOAE5A=="
+ACCESS_KEY="${MANILA_ACCESS_KEY:?export MANILA_ACCESS_KEY first}"
 MOUNT_POINT="/mnt/spack_hpl_manila"
 KEYRING_FILE="/etc/ceph/ceph.client.${CLIENT_NAME}.keyring"
 
